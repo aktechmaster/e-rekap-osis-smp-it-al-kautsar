@@ -1,6 +1,6 @@
 // GLOBAL STATE MANAGEMENT
 const DEFAULT_STATE = {
-  schoolName: "SMA NEGERI 1 E-REKAP OSIS",
+  schoolName: "SMP IT Al-Kautsar Mukomuko E-REKAP OSIS",
   electionTitle: "Pemilihan Ketua & Wakil Ketua OSIS Periode 2024/2025",
   totalDPT: 1000,
   isLocked: false,
