@@ -1,266 +1,402 @@
-// State Data Pemilihan
-let config = {
-  schoolName: "SMP IT Al-Kautsar Mukomuko",
-  eventName: "E-Rekapitulasi Suara Pemilihan Ketua & Wakil Ketua OSIS",
-  dpt: 1200,
-  paslonNames: [
-    "Calon Ketua 1 & Calon Wakil 1",
-    "Calon Ketua 2 & Calon Wakil 2",
-    "Calon Ketua 3 & Calon Wakil 3",
-    "Calon Ketua 4 & Calon Wakil 4"
-  ],
-  paslonImages: [
-    "https://via.placeholder.com/300x200/2563eb/ffffff?text=Foto+Paslon+01",
-    "https://via.placeholder.com/300x200/059669/ffffff?text=Foto+Paslon+02",
-    "https://via.placeholder.com/300x200/d97706/ffffff?text=Foto+Paslon+03",
-    "https://via.placeholder.com/300x200/7c3aed/ffffff?text=Foto+Paslon+04"
-  ]
+// GLOBAL STATE MANAGEMENT
+const DEFAULT_STATE = {
+  schoolName: "SMA NEGERI 1 E-REKAP OSIS",
+  electionTitle: "Pemilihan Ketua & Wakil Ketua OSIS Periode 2024/2025",
+  totalDPT: 1000,
+  isLocked: false,
+  soundEnabled: true,
+  votes: {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    invalid: 0
+  },
+  paslon: {
+    1: { name: "1. Ahmad Fikri & Aisyah Putri", vision: "Visi: OSIS Inovatif, Inklusif & Berprestasi", image: "https://placehold.co/400x400/1e293b/3b82f6?text=Paslon+01" },
+    2: { name: "2. Bima Pratama & Rizky Ramadhan", vision: "Visi: Kolaborasi Digital & Kepemimpinan Akhlak", image: "https://placehold.co/400x400/1e293b/10b981?text=Paslon+02" },
+    3: { name: "3. Citra Lestari & Dewa Saputra", vision: "Visi: Lingkungan Hijau & Pentas Seni Kreatif", image: "https://placehold.co/400x400/1e293b/f59e0b?text=Paslon+03" },
+    4: { name: "4. Dion Wijaya & Elena Nur", vision: "Visi: Sportivitas Olahraga & Apresiasi Bakat", image: "https://placehold.co/400x400/1e293b/8b5cf6?text=Paslon+04" }
+  }
 };
 
-let votes = {
-  1: 0,
-  2: 0,
-  3: 0,
-  4: 0,
-  invalid: 0
-};
+let appState = JSON.parse(localStorage.getItem('e_rekap_osis_state')) || DEFAULT_STATE;
 
-let isLocked = false;
+// WEB AUDIO API SYNTHESIZER
+let audioCtx = null;
 
-// Audio Beep menggunakan Web Audio API (Offline First)
-function playBeep(freq = 600, duration = 0.08) {
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function playBeep(type = 'add') {
+  if (!appState.soundEnabled) return;
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    initAudio();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
-    gain.gain.value = 0.1;
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
+
+    if (type === 'add') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'sub') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(293.66, audioCtx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.12);
+    } else if (type === 'invalid') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.15);
+    }
   } catch (e) {
-    console.log("Audio not supported or blocked");
+    console.log("Audio not supported or waiting for user interaction.", e);
   }
 }
 
-// Inisialisasi Aplikasi saat Load
-document.addEventListener("DOMContentLoaded", () => {
-  loadLocalStorage();
-  updateUI();
-});
+// SAVE STATE TO LOCAL STORAGE
+function saveState() {
+  localStorage.setItem('e_rekap_osis_state', JSON.stringify(appState));
+  renderUI();
+}
 
-// Tambah Suara (+1)
-function addVote(paslonId) {
-  if (isLocked) return;
-  
-  if (paslonId === 0) {
-    votes.invalid++;
+// MAIN VOTE ACTION (+1)
+function handleVote(id, event) {
+  if (appState.isLocked) return;
+  if (id === 'invalid') {
+    appState.votes.invalid += 1;
+    playBeep('invalid');
   } else {
-    votes[paslonId]++;
+    appState.votes[id] += 1;
+    playBeep('add');
   }
-  
-  playBeep(800, 0.06);
-  saveLocalStorage();
-  updateUI();
+  createFloatAnimation(event, "+1");
+  saveState();
 }
 
-// Kurangi Suara (-1 Undo)
-function undoVote(paslonId) {
-  if (isLocked) return;
-
-  if (paslonId === 0 && votes.invalid > 0) {
-    votes.invalid--;
-  } else if (paslonId > 0 && votes[paslonId] > 0) {
-    votes[paslonId]--;
-  }
-  
-  playBeep(300, 0.1);
-  saveLocalStorage();
-  updateUI();
-}
-
-// Update Perhitungan & Tampilan
-function updateUI() {
-  const totalVotes = votes[1] + votes[2] + votes[3] + votes[4] + votes.invalid;
-  
-  // Header Stats
-  document.getElementById("stat-dpt").innerText = config.dpt.toLocaleString();
-  document.getElementById("stat-total").innerText = totalVotes.toLocaleString();
-  document.getElementById("stat-rusak").innerText = votes.invalid.toLocaleString();
-  
-  const partisipasi = config.dpt > 0 ? ((totalVotes / config.dpt) * 100).toFixed(1) : 0;
-  document.getElementById("stat-partisipasi").innerText = partisipasi + "%";
-
-  // Hitung Nilai Tertinggi untuk Highlight Paslon Unggul
-  let maxVotes = 0;
-  for (let i = 1; i <= 4; i++) {
-    if (votes[i] > maxVotes) maxVotes = votes[i];
-  }
-
-  // Update Kartu Paslon 1-4
-  for (let i = 1; i <= 4; i++) {
-    document.getElementById(`vote-${i}`).innerText = votes[i];
-    document.getElementById(`name-${i}`).innerText = config.paslonNames[i - 1];
-    document.getElementById(`img-${i}`).src = config.paslonImages[i - 1];
-    
-    const pct = totalVotes > 0 ? ((votes[i] / totalVotes) * 100).toFixed(1) : "0.0";
-    document.getElementById(`percent-${i}`).innerText = pct + "%";
-    document.getElementById(`bar-${i}`).style.width = pct + "%";
-
-    // Highlight Paslon Unggul
-    const badge = document.getElementById(`badge-${i}`);
-    const card = document.getElementById(`card-${i}`);
-    if (votes[i] > 0 && votes[i] === maxVotes) {
-      badge.classList.remove("hidden");
-      card.style.borderColor = "#f59e0b";
-    } else {
-      badge.classList.add("hidden");
-      card.style.borderColor = "var(--border-color)";
+// UNDO VOTE ACTION (-1)
+function handleUndo(id, event) {
+  event.stopPropagation();
+  if (appState.isLocked) return;
+  if (id === 'invalid') {
+    if (appState.votes.invalid > 0) {
+      appState.votes.invalid -= 1;
+      playBeep('sub');
+      createFloatAnimation(event, "-1", "text-rose-400");
+    }
+  } else {
+    if (appState.votes[id] > 0) {
+      appState.votes[id] -= 1;
+      playBeep('sub');
+      createFloatAnimation(event, "-1", "text-amber-400");
     }
   }
-
-  // Suara Rusak
-  document.getElementById("vote-invalid").innerText = votes.invalid + " Suara";
-  const pctInvalid = totalVotes > 0 ? ((votes.invalid / totalVotes) * 100).toFixed(1) : "0.0";
-  document.getElementById("bar-invalid").style.width = pctInvalid + "%";
+  saveState();
 }
 
-// Lock / Unlock Screen
-function toggleLock() {
-  isLocked = !isLocked;
-  const lockScreen = document.getElementById("lock-screen");
-  if (isLocked) {
-    lockScreen.classList.remove("hidden");
+// FLOATING ANIMATION (+1 / -1)
+function createFloatAnimation(event, text, colorClass = "text-emerald-400") {
+  const floatEl = document.createElement("div");
+  floatEl.className = `float-number text-2xl ${colorClass}`;
+  floatEl.innerText = text;
+  
+  let x = event.clientX;
+  let y = event.clientY;
+  if (!x || !y) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    x = rect.left + rect.width / 2;
+    y = rect.top + rect.height / 2;
+  }
+  floatEl.style.left = `${x - 15}px`;
+  floatEl.style.top = `${y - 20}px`;
+  document.body.appendChild(floatEl);
+  setTimeout(() => {
+    floatEl.remove();
+  }, 800);
+}
+
+// RENDER UI STATE
+function renderUI() {
+  document.getElementById('headerSchoolName').childNodes[0].nodeValue = appState.schoolName + " ";
+  document.getElementById('headerElectionTitle').innerText = appState.electionTitle;
+  document.getElementById('statDPT').innerText = appState.totalDPT.toLocaleString('id-ID');
+
+  const lockBtn = document.getElementById('lockBtn');
+  const lockBanner = document.getElementById('lockBanner');
+  if (appState.isLocked) {
+    lockBtn.className = "touch-btn px-4 py-2 rounded-lg bg-rose-500 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-rose-500/30";
+    document.getElementById('lockIcon').className = "fa-solid fa-lock";
+    document.getElementById('lockText').innerText = "TERKUNCI";
+    lockBanner.classList.remove('hidden');
   } else {
-    lockScreen.classList.add("hidden");
+    lockBtn.className = "touch-btn px-4 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-sm font-semibold flex items-center gap-2";
+    document.getElementById('lockIcon').className = "fa-solid fa-lock-open";
+    document.getElementById('lockText').innerText = "Buka Kunci";
+    lockBanner.classList.add('hidden');
+  }
+
+  const soundBtn = document.getElementById('soundToggleBtn');
+  if (appState.soundEnabled) {
+    soundBtn.innerHTML = `<i class="fa-solid fa-volume-high text-emerald-400"></i><span class="hidden sm:inline">Suara: ON</span>`;
+  } else {
+    soundBtn.innerHTML = `<i class="fa-solid fa-volume-xmark text-slate-500"></i><span class="hidden sm:inline">Suara: OFF</span>`;
+  }
+
+  const v1 = appState.votes[1];
+  const v2 = appState.votes[2];
+  const v3 = appState.votes[3];
+  const v4 = appState.votes[4];
+  const vInvalid = appState.votes.invalid;
+  const totalValid = v1 + v2 + v3 + v4;
+  const totalAll = totalValid + vInvalid;
+  const turnoutPct = appState.totalDPT > 0 ? ((totalAll / appState.totalDPT) * 100).toFixed(1) : 0;
+
+  document.getElementById('statTotalVotes').innerText = totalAll.toLocaleString('id-ID');
+  document.getElementById('statTurnoutPct').innerText = `${turnoutPct}% DPT`;
+  document.getElementById('statValidVotes').innerText = totalValid.toLocaleString('id-ID');
+  document.getElementById('statValidPct').innerText = totalAll > 0 ? `${((totalValid / totalAll) * 100).toFixed(1)}% Total` : "0% Total";
+  document.getElementById('statInvalidVotes').innerText = vInvalid.toLocaleString('id-ID');
+  document.getElementById('statInvalidPct').innerText = totalAll > 0 ? `${((vInvalid / totalAll) * 100).toFixed(1)}% Total` : "0% Total";
+
+  const candidates = [1, 2, 3, 4];
+  let maxVotes = -1;
+  let leadingCandidateId = null;
+
+  candidates.forEach(id => {
+    const votes = appState.votes[id];
+    const pct = totalAll > 0 ? ((votes / totalAll) * 100).toFixed(1) : "0.0";
+    
+    document.getElementById(`countPaslon${id}`).innerText = votes.toLocaleString('id-ID');
+    document.getElementById(`pctPaslon${id}`).innerText = `${pct}%`;
+    document.getElementById(`namePaslon${id}`).innerText = appState.paslon[id].name;
+    document.getElementById(`visionPaslon${id}`).innerText = appState.paslon[id].vision;
+    if (appState.paslon[id].image) {
+      document.getElementById(`imgPaslon${id}`).src = appState.paslon[id].image;
+    }
+
+    if (votes > maxVotes && votes > 0) {
+      maxVotes = votes;
+      leadingCandidateId = id;
+    }
+  });
+
+  document.getElementById('countInvalid').innerText = vInvalid.toLocaleString('id-ID');
+
+  candidates.forEach(id => {
+    const badge = document.getElementById(`badgeLead${id}`);
+    const card = document.getElementById(`cardPaslon${id}`);
+    if (id === leadingCandidateId && maxVotes > 0) {
+      badge.classList.remove('hidden');
+      card.classList.add('border-amber-400', 'pulse-glow');
+    } else {
+      badge.classList.add('hidden');
+      card.classList.remove('border-amber-400', 'pulse-glow');
+    }
+  });
+
+  const statusText = document.getElementById('leadingStatusText');
+  if (leadingCandidateId && maxVotes > 0) {
+    statusText.innerText = `Memimpin: Paslon 0${leadingCandidateId} dengan ${maxVotes} Suara`;
+    statusText.className = "text-amber-400 font-bold";
+  } else {
+    statusText.innerText = "Belum ada suara masuk";
+    statusText.className = "text-slate-400 font-normal";
+  }
+
+  if (totalAll > 0) {
+    document.getElementById('barPaslon1').style.width = `${(v1 / totalAll) * 100}%`;
+    document.getElementById('barPaslon2').style.width = `${(v2 / totalAll) * 100}%`;
+    document.getElementById('barPaslon3').style.width = `${(v3 / totalAll) * 100}%`;
+    document.getElementById('barPaslon4').style.width = `${(v4 / totalAll) * 100}%`;
+    document.getElementById('barInvalid').style.width = `${(vInvalid / totalAll) * 100}%`;
+  } else {
+    document.getElementById('barPaslon1').style.width = '0%';
+    document.getElementById('barPaslon2').style.width = '0%';
+    document.getElementById('barPaslon3').style.width = '0%';
+    document.getElementById('barPaslon4').style.width = '0%';
+    document.getElementById('barInvalid').style.width = '0%';
   }
 }
 
-// Modal Settings Functions
-function openSettings() {
-  document.getElementById("input-school").value = config.schoolName;
-  document.getElementById("input-event").value = config.eventName;
-  document.getElementById("input-dpt").value = config.dpt;
-  
+// LOCK / UNLOCK TOGGLE
+function toggleLock() {
+  appState.isLocked = !appState.isLocked;
+  playBeep('sub');
+  saveState();
+}
+
+// SOUND TOGGLE
+function toggleSound() {
+  appState.soundEnabled = !appState.soundEnabled;
+  saveState();
+}
+
+// SETTINGS MODAL HANDLERS
+function openSettingsModal() {
+  document.getElementById('inputSchoolName').value = appState.schoolName;
+  document.getElementById('inputElectionTitle').value = appState.electionTitle;
+  document.getElementById('inputDPT').value = appState.totalDPT;
   for (let i = 1; i <= 4; i++) {
-    document.getElementById(`input-name-${i}`).value = config.paslonNames[i - 1];
+    document.getElementById(`inputName${i}`).value = appState.paslon[i].name;
   }
-
-  document.getElementById("settings-modal").classList.remove("hidden");
+  document.getElementById('settingsModal').classList.remove('hidden');
 }
 
-function closeSettings() {
-  document.getElementById("settings-modal").classList.add("hidden");
+function closeSettingsModal() {
+  document.getElementById('settingsModal').classList.add('hidden');
 }
 
-function saveSettings() {
-  config.schoolName = document.getElementById("input-school").value;
-  config.eventName = document.getElementById("input-event").value;
-  config.dpt = parseInt(document.getElementById("input-dpt").value) || 0;
-
-  for (let i = 1; i <= 4; i++) {
-    config.paslonNames[i - 1] = document.getElementById(`input-name-${i}`).value;
-  }
-
-  document.getElementById("school-title").innerText = config.schoolName;
-  document.getElementById("event-title").innerText = config.eventName;
-
-  saveLocalStorage();
-  updateUI();
-  closeSettings();
-}
-
-// Handler Upload Foto Paslon Lokal
-function uploadImage(event, paslonId) {
-  const file = event.target.files[0];
-  if (file) {
+function previewUploadImage(id, input) {
+  if (input.files && input.files[0]) {
     const reader = new FileReader();
-    reader.onload = function(e) {
-      config.paslonImages[paslonId - 1] = e.target.result;
-      saveLocalStorage();
-      updateUI();
-    };
-    reader.readAsDataURL(file);
+    reader.onload = function (e) {
+      appState.paslon[id].image = e.target.result;
+    }
+    reader.readAsDataURL(input.files[0]);
   }
 }
 
-// Reset Suara
-function resetData() {
-  if (confirm("Apakah Anda yakin ingin mereset seluruh perhitungan suara kembali ke angka 0?")) {
-    votes = { 1: 0, 2: 0, 3: 0, 4: 0, invalid: 0 };
-    saveLocalStorage();
-    updateUI();
-    closeSettings();
-  }
-}
-
-// Modal Berita Acara
-function openBeritaAcara() {
-  const totalVotes = votes[1] + votes[2] + votes[3] + votes[4] + votes.invalid;
-  
-  document.getElementById("ba-school").innerText = config.schoolName;
-  document.getElementById("ba-event").innerText = config.eventName;
-  document.getElementById("ba-date").innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  
+function saveSettings(e) {
+  e.preventDefault();
+  appState.schoolName = document.getElementById('inputSchoolName').value || DEFAULT_STATE.schoolName;
+  appState.electionTitle = document.getElementById('inputElectionTitle').value || DEFAULT_STATE.electionTitle;
+  appState.totalDPT = parseInt(document.getElementById('inputDPT').value) || 1000;
   for (let i = 1; i <= 4; i++) {
-    document.getElementById(`ba-name-${i}`).innerText = config.paslonNames[i - 1];
-    document.getElementById(`ba-vote-${i}`).innerText = votes[i];
-    const pct = totalVotes > 0 ? ((votes[i] / totalVotes) * 100).toFixed(1) : 0;
-    document.getElementById(`ba-percent-${i}`).innerText = pct + "%";
+    appState.paslon[i].name = document.getElementById(`inputName${i}`).value || `Paslon 0${i}`;
   }
-
-  document.getElementById("ba-vote-invalid").innerText = votes.invalid;
-  document.getElementById("ba-percent-invalid").innerText = totalVotes > 0 ? ((votes.invalid / totalVotes) * 100).toFixed(1) + "%" : "0%";
-  
-  document.getElementById("ba-vote-total").innerText = totalVotes;
-  document.getElementById("ba-dpt").innerText = config.dpt;
-  document.getElementById("ba-partisipasi").innerText = config.dpt > 0 ? ((totalVotes / config.dpt) * 100).toFixed(1) + "%" : "0%";
-
-  document.getElementById("ba-modal").classList.remove("hidden");
+  saveState();
+  closeSettingsModal();
 }
 
-function closeBeritaAcara() {
-  document.getElementById("ba-modal").classList.add("hidden");
+// RESET MODAL HANDLERS
+function openResetModal() {
+  document.getElementById('resetModal').classList.remove('hidden');
 }
 
-// Ekspor ke CSV
+function closeResetModal() {
+  document.getElementById('resetModal').classList.add('hidden');
+}
+
+function executeReset() {
+  appState.votes = { 1: 0, 2: 0, 3: 0, 4: 0, invalid: 0 };
+  saveState();
+  closeResetModal();
+}
+
+// EXPORT TO CSV
 function exportCSV() {
-  const totalVotes = votes[1] + votes[2] + votes[3] + votes[4] + votes.invalid;
+  const totalValid = appState.votes[1] + appState.votes[2] + appState.votes[3] + appState.votes[4];
+  const totalAll = totalValid + appState.votes.invalid;
+  const dateStr = new Date().toLocaleString('id-ID');
+  
   let csvContent = "data:text/csv;charset=utf-8,";
-  csvContent += "No,Nama Paslon,Jumlah Suara,Persentase\n";
-
+  csvContent += `REKAPITULASI HASIL PEMILIHAN OSIS\n`;
+  csvContent += `Sekolah/Organisasi,${appState.schoolName}\n`;
+  csvContent += `Judul Pemilihan,${appState.electionTitle}\n`;
+  csvContent += `Waktu Ekspor,${dateStr}\n\n`;
+  csvContent += `No Paslon,Nama Pasangan Calon,Perolehan Suara,Persentase\n`;
+  
   for (let i = 1; i <= 4; i++) {
-    const pct = totalVotes > 0 ? ((votes[i] / totalVotes) * 100).toFixed(1) : 0;
-    csvContent += `${i},"${config.paslonNames[i - 1]}",${votes[i]},${pct}%\n`;
+    const v = appState.votes[i];
+    const pct = totalAll > 0 ? ((v / totalAll) * 100).toFixed(2) : 0;
+    csvContent += `Paslon 0${i},"${appState.paslon[i].name}",${v},${pct}%\n`;
   }
   
-  csvContent += `5,"SUARA TIDAK SAH",${votes.invalid},${totalVotes > 0 ? ((votes.invalid / totalVotes) * 100).toFixed(1) : 0}%\n`;
-  csvContent += `,"TOTAL SUARA",${totalVotes},100%\n`;
+  csvContent += `-,SUARA TIDAK SAH,${appState.votes.invalid},${totalAll > 0 ? ((appState.votes.invalid / totalAll) * 100).toFixed(2) : 0}%\n\n`;
+  csvContent += `Total Suara Sah,,${totalValid},\n`;
+  csvContent += `Total Suara Masuk,,${totalAll},\n`;
+  csvContent += `Total DPT Pemilih,,${appState.totalDPT},\n`;
 
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `Hasil_E-Rekap_OSIS_${new Date().toISOString().slice(0,10)}.csv`);
+  link.setAttribute("download", `E-Rekap_OSIS_${new Date().toISOString().slice(0,10)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
 
-// Persistensi Data Lokal
-function saveLocalStorage() {
-  localStorage.setItem("osis_votes", JSON.stringify(votes));
-  localStorage.setItem("osis_config", JSON.stringify(config));
+// OFFICIAL REPORT / BERITA ACARA MODAL
+function openBeritaAcaraModal() {
+  document.getElementById('printSchoolName').innerText = appState.schoolName.toUpperCase();
+  document.getElementById('printElectionTitle').innerText = appState.electionTitle.toUpperCase();
+  document.getElementById('printDateString').innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const tbody = document.getElementById('printTableBody');
+  tbody.innerHTML = "";
+
+  const totalValid = appState.votes[1] + appState.votes[2] + appState.votes[3] + appState.votes[4];
+  const totalAll = totalValid + appState.votes.invalid;
+  let highestVotes = -1;
+  let winnerName = "-";
+
+  for (let i = 1; i <= 4; i++) {
+    const v = appState.votes[i];
+    const pct = totalAll > 0 ? ((v / totalAll) * 100).toFixed(1) : "0";
+    if (v > highestVotes && v > 0) {
+      highestVotes = v;
+      winnerName = appState.paslon[i].name;
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="border border-black p-2 text-center font-bold">0${i}</td>
+      <td class="border border-black p-2">${appState.paslon[i].name}</td>
+      <td class="border border-black p-2 text-right font-semibold">${v.toLocaleString('id-ID')}</td>
+      <td class="border border-black p-2 text-right">${pct}%</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById('printTotalValid').innerText = totalValid.toLocaleString('id-ID');
+  document.getElementById('printTotalValidPct').innerText = totalAll > 0 ? `${((totalValid / totalAll) * 100).toFixed(1)}%` : "0%";
+  document.getElementById('printTotalInvalid').innerText = appState.votes.invalid.toLocaleString('id-ID');
+  document.getElementById('printTotalInvalidPct').innerText = totalAll > 0 ? `${((appState.votes.invalid / totalAll) * 100).toFixed(1)}%` : "0%";
+  document.getElementById('printTotalAll').innerText = totalAll.toLocaleString('id-ID');
+
+  if (highestVotes > 0) {
+    document.getElementById('printWinnerNote').innerHTML = `Berdasarkan hasil rekapitulasi suara di atas, perolehan suara tertinggi diraih oleh: <span class="font-bold underline text-black">${winnerName}</span> dengan total <span class="font-bold">${highestVotes} suara</span>.`;
+  } else {
+    document.getElementById('printWinnerNote').innerText = "Penghitungan suara masih berlangsung / belum ada suara masuk.";
+  }
+
+  document.getElementById('beritaAcaraModal').classList.remove('hidden');
 }
 
-function loadLocalStorage() {
-  const savedVotes = localStorage.getItem("osis_votes");
-  const savedConfig = localStorage.getItem("osis_config");
-  
-  if (savedVotes) votes = JSON.parse(savedVotes);
-  if (savedConfig) config = JSON.parse(savedConfig);
-  
-  document.getElementById("school-title").innerText = config.schoolName;
-  document.getElementById("event-title").innerText = config.eventName;
+function closeBeritaAcaraModal() {
+  document.getElementById('beritaAcaraModal').classList.add('hidden');
 }
+
+// KEYBOARD SHORTCUTS
+document.addEventListener('keydown', (e) => {
+  if (document.activeElement.tagName === 'INPUT') return;
+  if (e.key === '1') handleVote(1, e);
+  if (e.key === '2') handleVote(2, e);
+  if (e.key === '3') handleVote(3, e);
+  if (e.key === '4') handleVote(4, e);
+  if (e.key === '0') handleVote('invalid', e);
+  if (e.key.toLowerCase() === 'l') toggleLock();
+});
+
+// INITIAL RENDER ON LOAD
+window.onload = function() {
+  renderUI();
+};
