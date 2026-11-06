@@ -13,10 +13,10 @@ const DEFAULT_STATE = {
     invalid: 0
   },
   paslon: {
-    1: { name: "1. Ahmad Fikri & Aisyah Putri", vision: "Visi: OSIS Inovatif, Inklusif & Berprestasi", image: "https://placehold.co/400x400/1e293b/3b82f6?text=Paslon+01" },
-    2: { name: "2. Bima Pratama & Rizky Ramadhan", vision: "Visi: Kolaborasi Digital & Kepemimpinan Akhlak", image: "https://placehold.co/400x400/1e293b/10b981?text=Paslon+02" },
-    3: { name: "3. Citra Lestari & Dewa Saputra", vision: "Visi: Lingkungan Hijau & Pentas Seni Kreatif", image: "https://placehold.co/400x400/1e293b/f59e0b?text=Paslon+03" },
-    4: { name: "4. Dion Wijaya & Elena Nur", vision: "Visi: Sportivitas Olahraga & Apresiasi Bakat", image: "https://placehold.co/400x400/1e293b/8b5cf6?text=Paslon+04" }
+    1: { name: "1. Dzaki & Keano", vision: "-", image: "https://placehold.co/400x400/1e293b/3b82f6?text=Paslon+01" },
+    2: { name: "2. Azka & Adrian", vision: "-", image: "https://placehold.co/400x400/1e293b/10b981?text=Paslon+02" },
+    3: { name: "3. Dayana & Wawa", vision: "-", image: "https://placehold.co/400x400/1e293b/f59e0b?text=Paslon+03" },
+    4: { name: "4. Syaza & Cece", vision: "-", image: "https://placehold.co/400x400/1e293b/8b5cf6?text=Paslon+04" }
   }
 };
 
